@@ -1,3 +1,4 @@
+
 # from flask import Flask, request, jsonify
 # import requests
 # from flask_cors import CORS
@@ -11,7 +12,6 @@
 # from Scrapper.ratopati import RatopatiScraper
 # from Scrapper.setopati import SetopatiScraper
 # from Scrapper.gorkhapatra import GorkhapatraScraper
-
 
 # app = Flask(__name__)
 # CORS(app)
@@ -206,8 +206,6 @@
 
 # if __name__ == "__main__":
 #     app.run(debug=True)
-    
-    
 
 from flask import Flask, request, jsonify
 import requests
@@ -341,22 +339,22 @@ def summary(text, model, tokenizer, max_summary_length):
     inputs = tokenizer(text, return_tensors="pt", max_length=1024, truncation=True)
     input_ids = inputs.input_ids.to(model.device)
     summary_ids = model.generate(input_ids, max_length=max_summary_length, num_beams=4, length_penalty=0.1, early_stopping=True)
-    # print(f'Summary IDS:{summary_ids}')
     generated_summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     return generated_summary
 
 # Long summary
-def summary_nepali(text, model, tokenizer, max_summary_length=512):
-    chunks = split_text_by_sentence_end_in_range(text, 100, 150)
-    # for i in range(len(chunks)):
-    #     print(chunks[i])
-
+def summary_nepali(text, model, tokenizer, max_summary_length=1024):
+    chunks = split_text_by_sentence_end_in_range(text, 200, 300)  # Increased chunk size
+    
     summaries = [summary(chunk, model, tokenizer, max_summary_length) for chunk in chunks]
-
-    final_summary = ' '.join(summaries)
-
+    
+    # Join summaries and then create a final summary
+    intermediate_summary = ' '.join(summaries)
+    
+    # Generate a final summary from the intermediate summary
+    final_summary = summary(intermediate_summary, model, tokenizer, max_summary_length=2048)  # Increased max length
+    
     return final_summary
-
 
 # Short summary
 def mt5Summary(text, model, tokenizer, max_summary_length=512):
@@ -387,7 +385,7 @@ def mbartSummary(text, model, tokenizer, max_summary_length=512):
 
 @app.route('/summarize', methods=['POST'])
 def summarize():
-    data = request.get_json()  # Use get_json to parse the incoming JSON request
+    data = request.get_json()
     print(f"data: {data}")  
     text = data.get('text', '')  
     given_url = data.get('url', '')  
@@ -402,11 +400,11 @@ def summarize():
     if selected_model == 'model1' and selected_length == 'short':
         summarized_text = mt5Summary(formatted_text, model, tokenizer)
     elif selected_model == 'model1' and selected_length == 'long':
-        summarized_text = summary_nepali(formatted_text, model, tokenizer)
+        summarized_text = summary_nepali(formatted_text, model, tokenizer, max_summary_length=2048)  # Increased max length
     elif selected_model == 'model2' and selected_length == 'short':
         summarized_text = mbartSummary(formatted_text, model2, tokenizer2)
     elif selected_model == 'model2' and selected_length == 'long':
-        summarized_text = summary_nepali(formatted_text, model2, tokenizer2)
+        summarized_text = summary_nepali(formatted_text, model2, tokenizer2, max_summary_length=2048)  # Increased max length
 
     try:
         summary = jsonify({'summarized_text': summarized_text, 'formatted_text': formatted_text})
