@@ -1,0 +1,7 @@
+.venv
+client/node_modules/
+client/package-lock.json
+client/dockerfile
+backend/.env/
+backend/dockerfile
+docker-compose.yml
