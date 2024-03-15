@@ -335,53 +335,36 @@ def split_text_by_sentence_end_in_range(text, min_chunk_size, max_chunk_size, de
         chunks.append(" ".join(current_chunk))
     return chunks
 
-def summary(text, model, tokenizer, max_summary_length):
+def generate_summary(text, model, tokenizer, max_summary_length):
     inputs = tokenizer(text, return_tensors="pt", max_length=1024, truncation=True)
     input_ids = inputs.input_ids.to(model.device)
     summary_ids = model.generate(input_ids, max_length=max_summary_length, num_beams=4, length_penalty=0.1, early_stopping=True)
     generated_summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
     return generated_summary
 
-# Long summary
-def summary_nepali(text, model, tokenizer, max_summary_length=1024):
-    chunks = split_text_by_sentence_end_in_range(text, 200, 300)  # Increased chunk size
-    
-    summaries = [summary(chunk, model, tokenizer, max_summary_length) for chunk in chunks]
-    
-    # Join summaries and then create a final summary
+# Short summary for mT5
+def mt5Summary(text, model, tokenizer, max_summary_length=512):
+    return generate_summary(text, model, tokenizer, max_summary_length)
+
+# Long summary for mT5
+def mt5LongSummary(text, model, tokenizer):
+    chunks = split_text_by_sentence_end_in_range(text, 300, 400)
+    summaries = [generate_summary(chunk, model, tokenizer, max_summary_length=256) for chunk in chunks]
     intermediate_summary = ' '.join(summaries)
-    
-    # Generate a final summary from the intermediate summary
-    final_summary = summary(intermediate_summary, model, tokenizer, max_summary_length=2048)  # Increased max length
-    
+    final_summary = generate_summary(intermediate_summary, model, tokenizer, max_summary_length=1024)
     return final_summary
 
-# Short summary
-def mt5Summary(text, model, tokenizer, max_summary_length=512):
-    inputs = tokenizer(text, return_tensors="pt", max_length=max_summary_length, truncation=True)
-    summary_ids = model.generate(inputs.input_ids.to(model.device), 
-                                  max_length=max_summary_length, 
-                                  num_beams=5,
-                                  length_penalty=0.1,
-                                  early_stopping=True)
-
-    # Decode the generated summary
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-
-    return summary
-
-# Short summary
+# Short summary for mBART
 def mbartSummary(text, model, tokenizer, max_summary_length=512):
-    inputs = tokenizer(text, return_tensors="pt", max_length=max_summary_length, truncation=True)
-    summary_ids = model.generate(inputs.input_ids.to(model.device), 
-                                  max_length=max_summary_length, 
-                                  num_beams=5,
-                                  length_penalty=0.1,
-                                  early_stopping=True)
+    return generate_summary(text, model, tokenizer, max_summary_length)
 
-    # Decode the generated summary
-    summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-    return summary
+# Long summary for mBART
+def mbartLongSummary(text, model, tokenizer):
+    chunks = split_text_by_sentence_end_in_range(text, 300, 400)
+    summaries = [generate_summary(chunk, model, tokenizer, max_summary_length=256) for chunk in chunks]
+    intermediate_summary = ' '.join(summaries)
+    final_summary = generate_summary(intermediate_summary, model, tokenizer, max_summary_length=1024)
+    return final_summary
 
 @app.route('/summarize', methods=['POST'])
 def summarize():
@@ -400,11 +383,11 @@ def summarize():
     if selected_model == 'model1' and selected_length == 'short':
         summarized_text = mt5Summary(formatted_text, model, tokenizer)
     elif selected_model == 'model1' and selected_length == 'long':
-        summarized_text = summary_nepali(formatted_text, model, tokenizer, max_summary_length=2048)  # Increased max length
+        summarized_text = mt5LongSummary(formatted_text, model, tokenizer)
     elif selected_model == 'model2' and selected_length == 'short':
         summarized_text = mbartSummary(formatted_text, model2, tokenizer2)
     elif selected_model == 'model2' and selected_length == 'long':
-        summarized_text = summary_nepali(formatted_text, model2, tokenizer2, max_summary_length=2048)  # Increased max length
+        summarized_text = mbartLongSummary(formatted_text, model2, tokenizer2)
 
     try:
         summary = jsonify({'summarized_text': summarized_text, 'formatted_text': formatted_text})
